@@ -34,13 +34,21 @@ pub fn pixels_new_world(
 #[no_mangle]
 pub fn pixels_world_update(
     world: *mut ValueBox<World>,
-    width: u32,
-    height: u32,
+    surface_width: u32,
+    surface_height: u32,
+    buffer_width: u32,
+    buffer_height: u32,
     pixels: *mut ValueBox<BoxerArrayU8>,
 ) {
     world.with_not_null(|world| {
         pixels.with_not_null(|pixels| {
-            world.update(width, height, pixels.to_slice());
+            world.update(
+                surface_width,
+                surface_height,
+                buffer_width,
+                buffer_height,
+                pixels.to_slice(),
+            );
         })
     });
 }
@@ -67,8 +75,13 @@ pub struct World {
 impl World {
     pub fn draw(&mut self) {
         let mut buffer = self.buffer.lock().unwrap();
-        if buffer.size_dirty {
-            self.pixels.resize_buffer(buffer.width, buffer.height);
+        if buffer.buffer_size_dirty {
+            self.pixels
+                .resize_buffer(buffer.buffer_width, buffer.buffer_height);
+        }
+        if buffer.surface_size_dirty {
+            self.pixels
+                .resize_surface(buffer.surface_width, buffer.surface_height);
         }
         if buffer.pixels_dirty {
             let frame = self.pixels.get_frame();
@@ -80,16 +93,32 @@ impl World {
         self.pixels.render().expect("pixels.render() failed");
     }
 
-    pub fn update(&mut self, width: u32, height: u32, pixels: &[u8]) {
-        self.buffer.lock().unwrap().update(width, height, pixels);
+    pub fn update(
+        &mut self,
+        surface_width: u32,
+        surface_height: u32,
+        buffer_width: u32,
+        buffer_height: u32,
+        pixels: &[u8],
+    ) {
+        self.buffer.lock().unwrap().update(
+            surface_width,
+            surface_height,
+            buffer_width,
+            buffer_height,
+            pixels,
+        );
     }
 }
 
 #[derive(Debug)]
 pub struct Buffer {
-    width: u32,
-    height: u32,
-    size_dirty: bool,
+    buffer_width: u32,
+    buffer_height: u32,
+    buffer_size_dirty: bool,
+    surface_width: u32,
+    surface_height: u32,
+    surface_size_dirty: bool,
     pixels: Vec<u8>,
     pixels_dirty: bool,
 }
@@ -97,19 +126,35 @@ pub struct Buffer {
 impl Buffer {
     pub fn new() -> Self {
         Self {
-            width: 1,
-            height: 1,
-            size_dirty: false,
+            buffer_width: 1,
+            buffer_height: 1,
+            buffer_size_dirty: false,
+            surface_width: 1,
+            surface_height: 1,
+            surface_size_dirty: false,
             pixels: vec![0, 0, 0, 0],
             pixels_dirty: false,
         }
     }
 
-    pub fn update(&mut self, width: u32, height: u32, pixels: &[u8]) {
-        if self.width != width || self.height != height {
-            self.width = width;
-            self.height = height;
-            self.size_dirty = true;
+    pub fn update(
+        &mut self,
+        surface_width: u32,
+        surface_height: u32,
+        buffer_width: u32,
+        buffer_height: u32,
+        pixels: &[u8],
+    ) {
+        if self.buffer_width != buffer_width || self.buffer_height != buffer_height {
+            self.buffer_width = buffer_width;
+            self.buffer_height = buffer_height;
+            self.buffer_size_dirty = true;
+        }
+
+        if self.surface_width != surface_width || self.surface_height != surface_height {
+            self.surface_width = surface_width;
+            self.surface_height = surface_height;
+            self.surface_size_dirty = true;
         }
 
         self.pixels = Vec::from(pixels);
@@ -117,7 +162,8 @@ impl Buffer {
     }
 
     pub fn mark_clean(&mut self) {
-        self.size_dirty = false;
+        self.buffer_size_dirty = false;
+        self.surface_size_dirty = false;
         self.pixels_dirty = false;
     }
 
