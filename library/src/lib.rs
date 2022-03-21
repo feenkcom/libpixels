@@ -1,6 +1,7 @@
 use boxer::array::BoxerArrayU8;
 use boxer::{ValueBox, ValueBoxPointer, ValueBoxPointerReference};
-use pixels::{Pixels, SurfaceTexture};
+use pixels::wgpu::TextureFormat;
+use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::sync::Mutex;
 
@@ -20,7 +21,10 @@ pub fn pixels_new_world(
             handle: window_handle,
         };
         let surface_texture = SurfaceTexture::new(width, height, &window);
-        let pixels = Pixels::new(width, height, surface_texture).expect("Failed to create pixels");
+        let pixels = PixelsBuilder::new(width, height, surface_texture)
+            .texture_format(TextureFormat::Bgra8UnormSrgb)
+            .build()
+            .expect("Failed to create pixels");
 
         ValueBox::new(World {
             _window: window,
