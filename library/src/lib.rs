@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use boxer::array::BoxerArrayU8;
 use boxer::{ReturnBoxerResult, ValueBox, ValueBoxPointer, ValueBoxPointerReference};
 use euclid::{Point2D, Rect, Size2D};
@@ -12,6 +15,13 @@ use std::sync::Mutex;
 #[no_mangle]
 pub fn pixels_test() -> bool {
     true
+}
+
+#[no_mangle]
+pub fn pixels_init_logger() {
+    if let Err(error) = env_logger::try_init() {
+        eprintln!("[pixels] Failed to init env_logger: {}", error);
+    }
 }
 
 #[no_mangle]
@@ -172,9 +182,16 @@ impl World {
         let buffer_height = buffer.buffer_height;
 
         if buffer.buffer_size_dirty {
+            trace!("Resize buffer to {}x{}", &buffer_width, buffer_height);
             self.pixels
                 .resize_buffer(buffer_width as u32, buffer_height as u32);
         }
+        if buffer.surface_size_dirty {
+            trace!("Resize surface to {}x{}", &buffer.surface_width, buffer.surface_height);
+            self.pixels
+                .resize_surface(buffer.surface_width as u32, buffer.surface_height as u32);
+        }
+
         buffer.mark_clean();
         drop(buffer);
 
@@ -186,6 +203,8 @@ impl World {
         let mut damages = self.damages.lock().unwrap();
         for world_damage in damages.drain(0..) {
             if let Some(damage) = world_damage.damage.clamp(frame_image.as_ref()) {
+                trace!("Draw damage {:?}", &damage);
+
                 let damage_image =
                     ImgRef::new(world_damage.buffer.as_slice(), damage.width(), damage.height());
 
@@ -208,20 +227,25 @@ impl World {
     }
 
     pub fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
+        trace!("Record buffer resize to {}x{}", buffer_width, buffer_height);
         self.buffer
             .lock()
             .unwrap()
             .resize_buffer(buffer_width, buffer_height);
     }
 
-    /// Must only be called from the main thread
     pub fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
-        self.pixels
-            .resize_surface(surface_width as u32, surface_height as u32);
+        trace!("Record surface resize to {}x{}", surface_width, surface_height);
+        self.buffer
+            .lock()
+            .unwrap()
+            .resize_surface(surface_width, surface_height);
     }
 
     pub fn damage(&mut self, damage: Damage) {
         if let Some(world_damage) = self.buffer.lock().unwrap().damage(damage) {
+            trace!("Record damage {:?}", &world_damage.damage);
+
             let mut damages = self.damages.lock().unwrap();
 
             // if the new damage is larger than all previous damages combined, we get rid of all previous damages
@@ -241,6 +265,9 @@ pub struct Buffer {
     buffer_width: usize,
     buffer_height: usize,
     buffer_size_dirty: bool,
+    surface_width: usize,
+    surface_height: usize,
+    surface_size_dirty: bool,
     pixels: Vec<u32>,
 }
 
@@ -250,6 +277,9 @@ impl Buffer {
             buffer_width: 1,
             buffer_height: 1,
             buffer_size_dirty: false,
+            surface_width: 1,
+            surface_height: 1,
+            surface_size_dirty: false,
             pixels: vec![0],
         }
     }
@@ -265,6 +295,16 @@ impl Buffer {
 
         self.pixels
             .resize(buffer_width * buffer_height, Default::default());
+    }
+
+    pub fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
+        if self.surface_width == surface_width && self.surface_height == surface_height {
+            return;
+        }
+
+        self.surface_width = surface_width;
+        self.surface_height = surface_height;
+        self.surface_size_dirty = true;
     }
 
     fn buffer_ref(&self) -> ImgRef<u32> {
@@ -297,6 +337,7 @@ impl Buffer {
 
     pub fn mark_clean(&mut self) {
         self.buffer_size_dirty = false;
+        self.surface_size_dirty = false;
     }
 
     pub fn pixels(&self) -> &[u32] {
