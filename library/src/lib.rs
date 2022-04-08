@@ -1,8 +1,12 @@
 use boxer::array::BoxerArrayU8;
-use boxer::{ValueBox, ValueBoxPointer, ValueBoxPointerReference};
+use boxer::{ReturnBoxerResult, ValueBox, ValueBoxPointer, ValueBoxPointerReference};
+use euclid::{Point2D, Rect, Size2D};
+use imgref::*;
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use std::collections::VecDeque;
+use std::mem::transmute;
 use std::sync::Mutex;
 
 #[no_mangle]
@@ -12,16 +16,16 @@ pub fn pixels_test() -> bool {
 
 #[no_mangle]
 pub fn pixels_new_world(
-    width: u32,
-    height: u32,
+    surface_width: u32,
+    surface_height: u32,
     handle: *mut ValueBox<RawWindowHandle>,
 ) -> *mut ValueBox<World> {
     handle.with_not_null_value_return(std::ptr::null_mut(), |window_handle| {
         let window = Window {
             handle: window_handle,
         };
-        let surface_texture = SurfaceTexture::new(width, height, &window);
-        let pixels = PixelsBuilder::new(width, height, surface_texture)
+        let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
+        let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
             .texture_format(TextureFormat::Bgra8UnormSrgb)
             .build()
             .expect("Failed to create pixels");
@@ -30,31 +34,58 @@ pub fn pixels_new_world(
             _window: window,
             pixels,
             buffer: Mutex::new(Buffer::new()),
+            damages: Mutex::new(Default::default()),
+            current_damage: Default::default()
         })
         .into_raw()
     })
 }
 
 #[no_mangle]
-pub fn pixels_world_update(
+pub fn pixels_world_damage(
     world: *mut ValueBox<World>,
-    surface_width: u32,
-    surface_height: u32,
-    buffer_width: u32,
-    buffer_height: u32,
-    pixels: *mut ValueBox<BoxerArrayU8>,
+    left: usize,
+    top: usize,
+    width: usize,
+    height: usize,
 ) {
-    world.with_not_null(|world| {
-        pixels.with_not_null(|pixels| {
-            world.update(
-                surface_width,
-                surface_height,
-                buffer_width,
-                buffer_height,
-                pixels.to_slice(),
-            );
+    world
+        .to_ref()
+        .map(|mut world| {
+            world.damage(Damage::new(
+                Point2D::new(left, top),
+                Size2D::new(width, height),
+            ))
         })
-    });
+        .log();
+}
+
+#[no_mangle]
+pub fn pixels_world_resize_surface(world: *mut ValueBox<World>, width: usize, height: usize) {
+    world
+        .to_ref()
+        .map(|mut world| world.resize_surface(width, height))
+        .log();
+}
+
+#[no_mangle]
+pub fn pixels_world_resize_buffer(world: *mut ValueBox<World>, width: usize, height: usize) {
+    world
+        .to_ref()
+        .map(|mut world| world.resize_buffer(width, height))
+        .log();
+}
+
+#[no_mangle]
+pub fn pixels_world_get_buffer(world: *mut ValueBox<World>) -> *mut ValueBox<BoxerArrayU8> {
+    world
+        .to_ref()
+        .map(|world| {
+            let buffer = world.buffer.lock().unwrap();
+            let slice = buffer.pixels.as_slice();
+            BoxerArrayU8::from_data(slice.as_ptr() as *mut u8, slice.len() * 4)
+        })
+        .into_raw()
 }
 
 #[no_mangle]
@@ -70,61 +101,147 @@ pub fn pixels_world_drop(world: &mut *mut ValueBox<World>) {
 }
 
 #[derive(Debug)]
+pub struct DamageType {}
+pub type Damage = Rect<usize, DamageType>;
+
+pub trait Clamp {
+    fn clamp(&self, image: ImgRef<u32>) -> Option<Damage>;
+}
+
+impl Clamp for Damage {
+    fn clamp(&self, image: ImgRef<u32>) -> Option<Damage> {
+        let left = self.min_x().max(0).min(image.width());
+        let top = self.min_y().max(0).min(image.height());
+
+        let width = self.width().min(image.width() - left);
+        let height = self.height().min(image.height() - top);
+
+        if width == 0 || height == 0 {
+            return None;
+        } else {
+            Some(Damage::new(
+                Point2D::new(left, top),
+                Size2D::new(width, height),
+            ))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct WorldDamage {
+    damage: Damage,
+    buffer: Vec<u32>,
+}
+
+impl WorldDamage {
+    #[inline]
+    pub fn left(&self) -> usize {
+        self.damage.min_x()
+    }
+
+    #[inline]
+    pub fn top(&self) -> usize {
+        self.damage.min_y()
+    }
+
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.damage.width()
+    }
+
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.damage.height()
+    }
+}
+
+#[derive(Debug)]
 pub struct World {
     _window: Window,
     pixels: Pixels,
     buffer: Mutex<Buffer>,
+    damages: Mutex<VecDeque<WorldDamage>>,
+    current_damage: Damage
 }
 
 impl World {
     pub fn draw(&mut self) {
         let mut buffer = self.buffer.lock().unwrap();
+
+        let buffer_width = buffer.buffer_width;
+        let buffer_height = buffer.buffer_height;
+
         if buffer.buffer_size_dirty {
             self.pixels
-                .resize_buffer(buffer.buffer_width, buffer.buffer_height);
-        }
-        if buffer.surface_size_dirty {
-            self.pixels
-                .resize_surface(buffer.surface_width, buffer.surface_height);
-        }
-        if buffer.pixels_dirty {
-            let frame = self.pixels.get_frame();
-            frame.clone_from_slice(buffer.pixels());
+                .resize_buffer(buffer_width as u32, buffer_height as u32);
         }
         buffer.mark_clean();
         drop(buffer);
 
+        let frame: &mut [u32] = unsafe { transmute(self.pixels.get_frame()) };
+
+        let mut frame_image =
+            ImgRefMut::new_stride(frame, buffer_width, buffer_height, buffer_width);
+
+        let mut damages = self.damages.lock().unwrap();
+        for world_damage in damages.drain(0..) {
+            if let Some(damage) = world_damage.damage.clamp(frame_image.as_ref()) {
+                let damage_image =
+                    ImgRef::new(world_damage.buffer.as_slice(), damage.width(), damage.height());
+
+                let mut frame_image = frame_image.sub_image_mut(
+                    damage.min_x(),
+                    damage.min_y(),
+                    damage.width(),
+                    damage.height(),
+                );
+
+                for (damage_row, frame_row) in damage_image.rows().zip(frame_image.rows_mut()) {
+                    frame_row.clone_from_slice(damage_row);
+                }
+            }
+        }
+        self.current_damage = Damage::default();
+        drop(damages);
+
         self.pixels.render().expect("pixels.render() failed");
     }
 
-    pub fn update(
-        &mut self,
-        surface_width: u32,
-        surface_height: u32,
-        buffer_width: u32,
-        buffer_height: u32,
-        pixels: &[u8],
-    ) {
-        self.buffer.lock().unwrap().update(
-            surface_width,
-            surface_height,
-            buffer_width,
-            buffer_height,
-            pixels,
-        );
+    pub fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
+        self.buffer
+            .lock()
+            .unwrap()
+            .resize_buffer(buffer_width, buffer_height);
+    }
+
+    /// Must only be called from the main thread
+    pub fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
+        self.pixels
+            .resize_surface(surface_width as u32, surface_height as u32);
+    }
+
+    pub fn damage(&mut self, damage: Damage) {
+        if let Some(world_damage) = self.buffer.lock().unwrap().damage(damage) {
+            let mut damages = self.damages.lock().unwrap();
+
+            // if the new damage is larger than all previous damages combined, we get rid of all previous damages
+            if world_damage.damage.contains_rect(&self.current_damage) {
+                damages.drain(0..);
+                self.current_damage = world_damage.damage.clone();
+            } else {
+                self.current_damage = self.current_damage.union(&world_damage.damage);
+            }
+            damages.push_back(world_damage)
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct Buffer {
-    buffer_width: u32,
-    buffer_height: u32,
+    buffer_width: usize,
+    buffer_height: usize,
     buffer_size_dirty: bool,
-    surface_width: u32,
-    surface_height: u32,
-    surface_size_dirty: bool,
-    pixels: Vec<u8>,
-    pixels_dirty: bool,
+    pixels: Vec<u32>,
 }
 
 impl Buffer {
@@ -133,45 +250,56 @@ impl Buffer {
             buffer_width: 1,
             buffer_height: 1,
             buffer_size_dirty: false,
-            surface_width: 1,
-            surface_height: 1,
-            surface_size_dirty: false,
-            pixels: vec![0, 0, 0, 0],
-            pixels_dirty: false,
+            pixels: vec![0],
         }
     }
 
-    pub fn update(
-        &mut self,
-        surface_width: u32,
-        surface_height: u32,
-        buffer_width: u32,
-        buffer_height: u32,
-        pixels: &[u8],
-    ) {
-        if self.buffer_width != buffer_width || self.buffer_height != buffer_height {
-            self.buffer_width = buffer_width;
-            self.buffer_height = buffer_height;
-            self.buffer_size_dirty = true;
+    pub fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
+        if self.buffer_width == buffer_width && self.buffer_height == buffer_height {
+            return;
         }
 
-        if self.surface_width != surface_width || self.surface_height != surface_height {
-            self.surface_width = surface_width;
-            self.surface_height = surface_height;
-            self.surface_size_dirty = true;
-        }
+        self.buffer_width = buffer_width;
+        self.buffer_height = buffer_height;
+        self.buffer_size_dirty = true;
 
-        self.pixels = Vec::from(pixels);
-        self.pixels_dirty = true;
+        self.pixels
+            .resize(buffer_width * buffer_height, Default::default());
+    }
+
+    fn buffer_ref(&self) -> ImgRef<u32> {
+        ImgRef::new(
+            self.pixels.as_slice(),
+            self.buffer_width,
+            self.buffer_height,
+        )
+    }
+
+    pub fn damage(&mut self, damage: Damage) -> Option<WorldDamage> {
+        let buffer_image = self.buffer_ref();
+
+        damage.clamp(buffer_image).map(|damage| {
+            let damaged_image = buffer_image.sub_image(
+                damage.min_x(),
+                damage.min_y(),
+                damage.width(),
+                damage.height(),
+            );
+
+            let (buffer, _, _) = damaged_image.to_contiguous_buf();
+
+            WorldDamage {
+                damage,
+                buffer: buffer.to_vec(),
+            }
+        })
     }
 
     pub fn mark_clean(&mut self) {
         self.buffer_size_dirty = false;
-        self.surface_size_dirty = false;
-        self.pixels_dirty = false;
     }
 
-    pub fn pixels(&self) -> &[u8] {
+    pub fn pixels(&self) -> &[u32] {
         self.pixels.as_slice()
     }
 }

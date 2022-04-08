@@ -1,13 +1,15 @@
 [package]
 name = "libpixels"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["feenk gmbh. <contact@feenk.com>"]
 edition = "2021"
 
 [dependencies]
-pixels = "0.9"
+pixels = "0.9.0"
 raw-window-handle = "0.4.2"
-boxer = { git = "https://github.com/feenkcom/gtoolkit-boxer", rev = "8ffd345b6aabda55c5ab1b4914f6f3e5f92918d4" }
+imgref = "1.9.1"
+euclid = "0.22.7"
+boxer = { git = "https://github.com/feenkcom/gtoolkit-boxer", rev = "4cc03d989c46aeb78d1a4f142360239cf8df7de3" }
 
 [lib]
 name = "Pixels"
