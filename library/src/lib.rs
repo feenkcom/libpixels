@@ -5,7 +5,7 @@ use boxer::array::BoxerArrayU8;
 use boxer::{ReturnBoxerResult, ValueBox, ValueBoxPointer, ValueBoxPointerReference};
 use euclid::{Point2D, Rect, Size2D};
 use imgref::*;
-use pixels::wgpu::TextureFormat;
+use pixels::wgpu::{Backends, TextureFormat};
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::collections::VecDeque;
@@ -36,6 +36,7 @@ pub fn pixels_new_world(
         };
         let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
         let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
+            .wgpu_backend(Backends::DX12 | Backends::METAL | Backends::GL | Backends::DX11)
             .texture_format(TextureFormat::Bgra8UnormSrgb)
             .build()
             .expect("Failed to create pixels");
@@ -45,7 +46,7 @@ pub fn pixels_new_world(
             pixels,
             buffer: Mutex::new(Buffer::new()),
             damages: Mutex::new(Default::default()),
-            current_damage: Default::default()
+            current_damage: Default::default(),
         })
         .into_raw()
     })
@@ -171,7 +172,7 @@ pub struct World {
     pixels: Pixels,
     buffer: Mutex<Buffer>,
     damages: Mutex<VecDeque<WorldDamage>>,
-    current_damage: Damage
+    current_damage: Damage,
 }
 
 impl World {
@@ -187,7 +188,11 @@ impl World {
                 .resize_buffer(buffer_width as u32, buffer_height as u32);
         }
         if buffer.surface_size_dirty {
-            trace!("Resize surface to {}x{}", &buffer.surface_width, buffer.surface_height);
+            trace!(
+                "Resize surface to {}x{}",
+                &buffer.surface_width,
+                buffer.surface_height
+            );
             self.pixels
                 .resize_surface(buffer.surface_width as u32, buffer.surface_height as u32);
         }
@@ -205,8 +210,11 @@ impl World {
             if let Some(damage) = world_damage.damage.clamp(frame_image.as_ref()) {
                 trace!("Draw damage {:?}", &damage);
 
-                let damage_image =
-                    ImgRef::new(world_damage.buffer.as_slice(), damage.width(), damage.height());
+                let damage_image = ImgRef::new(
+                    world_damage.buffer.as_slice(),
+                    damage.width(),
+                    damage.height(),
+                );
 
                 let mut frame_image = frame_image.sub_image_mut(
                     damage.min_x(),
@@ -235,7 +243,11 @@ impl World {
     }
 
     pub fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
-        trace!("Record surface resize to {}x{}", surface_width, surface_height);
+        trace!(
+            "Record surface resize to {}x{}",
+            surface_width,
+            surface_height
+        );
         self.buffer
             .lock()
             .unwrap()
