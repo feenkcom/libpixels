@@ -1,16 +1,18 @@
+#![allow(non_snake_case)]
 #[macro_use]
 extern crate log;
 
-use boxer::array::BoxerArrayU8;
-use boxer::{ReturnBoxerResult, ValueBox, ValueBoxPointer, ValueBoxPointerReference};
+use array_box::ArrayBox;
+use std::collections::VecDeque;
+use std::mem::transmute;
+use std::sync::Mutex;
+
 use euclid::{Point2D, Rect, Size2D};
 use imgref::*;
 use pixels::wgpu::{Backends, TextureFormat};
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-use std::collections::VecDeque;
-use std::mem::transmute;
-use std::sync::Mutex;
+use value_box::{ReturnBoxerResult, ValueBox, ValueBoxPointer};
 
 #[no_mangle]
 pub fn pixels_test() -> bool {
@@ -30,26 +32,27 @@ pub fn pixels_new_world(
     surface_height: u32,
     handle: *mut ValueBox<RawWindowHandle>,
 ) -> *mut ValueBox<World> {
-    handle.with_not_null_value_return(std::ptr::null_mut(), |window_handle| {
-        let window = Window {
-            handle: window_handle,
-        };
-        let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
-        let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
-            .wgpu_backend(Backends::DX12 | Backends::METAL | Backends::GL | Backends::DX11)
-            .texture_format(TextureFormat::Bgra8UnormSrgb)
-            .build()
-            .expect("Failed to create pixels");
+    handle
+        .with_clone(|window_handle| {
+            let window = Window {
+                handle: window_handle,
+            };
+            let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
+            let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
+                .wgpu_backend(Backends::METAL | Backends::GL | Backends::DX11)
+                .texture_format(TextureFormat::Bgra8UnormSrgb)
+                .build()
+                .expect("Failed to create pixels");
 
-        ValueBox::new(World {
-            _window: window,
-            pixels,
-            buffer: Mutex::new(Buffer::new()),
-            damages: Mutex::new(Default::default()),
-            current_damage: Default::default(),
+            World {
+                _window: window,
+                pixels,
+                buffer: Mutex::new(Buffer::new()),
+                damages: Mutex::new(Default::default()),
+                current_damage: Default::default(),
+            }
         })
         .into_raw()
-    })
 }
 
 #[no_mangle]
@@ -61,8 +64,7 @@ pub fn pixels_world_damage(
     height: usize,
 ) {
     world
-        .to_ref()
-        .map(|mut world| {
+        .with_mut(|world| {
             world.damage(Damage::new(
                 Point2D::new(left, top),
                 Size2D::new(width, height),
@@ -74,41 +76,36 @@ pub fn pixels_world_damage(
 #[no_mangle]
 pub fn pixels_world_resize_surface(world: *mut ValueBox<World>, width: usize, height: usize) {
     world
-        .to_ref()
-        .map(|mut world| world.resize_surface(width, height))
+        .with_mut(|world| world.resize_surface(width, height))
         .log();
 }
 
 #[no_mangle]
 pub fn pixels_world_resize_buffer(world: *mut ValueBox<World>, width: usize, height: usize) {
     world
-        .to_ref()
-        .map(|mut world| world.resize_buffer(width, height))
+        .with_mut(|world| world.resize_buffer(width, height))
         .log();
 }
 
 #[no_mangle]
-pub fn pixels_world_get_buffer(world: *mut ValueBox<World>) -> *mut ValueBox<BoxerArrayU8> {
+pub fn pixels_world_get_buffer(world: *mut ValueBox<World>) -> *mut ValueBox<ArrayBox<u8>> {
     world
-        .to_ref()
-        .map(|world| {
+        .with_ref(|world| {
             let buffer = world.buffer.lock().unwrap();
             let slice = buffer.pixels.as_slice();
-            BoxerArrayU8::from_data(slice.as_ptr() as *mut u8, slice.len() * 4)
+            ArrayBox::from_data(slice.as_ptr() as *mut u8, slice.len() * 4)
         })
         .into_raw()
 }
 
 #[no_mangle]
 pub fn pixels_world_draw(world: *mut ValueBox<World>) {
-    world.with_not_null(|world| {
-        world.draw();
-    });
+    world.with_mut(World::draw).log();
 }
 
 #[no_mangle]
-pub fn pixels_world_drop(world: &mut *mut ValueBox<World>) {
-    world.drop();
+pub fn pixels_world_drop(world: *mut ValueBox<World>) {
+    world.release();
 }
 
 #[derive(Debug)]
@@ -200,7 +197,7 @@ impl World {
         buffer.mark_clean();
         drop(buffer);
 
-        let frame: &mut [u32] = unsafe { transmute(self.pixels.get_frame()) };
+        let frame: &mut [u32] = unsafe { transmute(self.pixels.get_frame_mut()) };
 
         let mut frame_image =
             ImgRefMut::new_stride(frame, buffer_width, buffer_height, buffer_width);

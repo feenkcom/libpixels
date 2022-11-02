@@ -5,13 +5,14 @@ authors = ["feenk gmbh. <contact@feenk.com>"]
 edition = "2021"
 
 [dependencies]
-pixels = "0.9.0"
-raw-window-handle = "0.4.2"
-imgref = "1.9.1"
-euclid = "0.22.7"
-log = "0.4.16"
-env_logger = "0.9.0"
-boxer = { git = "https://github.com/feenkcom/gtoolkit-boxer", rev = "4cc03d989c46aeb78d1a4f142360239cf8df7de3" }
+pixels = "0.10"
+raw-window-handle = "0.4"
+imgref = "1.9"
+euclid = "0.22"
+log = "0.4"
+env_logger = "0.9"
+value-box = "1.1"
+array-box = "1.0"
 
 [lib]
 name = "Pixels"
