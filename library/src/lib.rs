@@ -2,11 +2,11 @@
 #[macro_use]
 extern crate log;
 
-use array_box::ArrayBox;
 use std::collections::VecDeque;
 use std::mem::transmute;
 use std::sync::Mutex;
 
+use array_box::ArrayBox;
 use euclid::{Point2D, Rect, Size2D};
 use imgref::*;
 use pixels::wgpu::{Backends, TextureFormat};
