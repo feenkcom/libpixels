@@ -9,10 +9,12 @@ use std::sync::Mutex;
 use array_box::ArrayBox;
 use euclid::{Point2D, Rect, Size2D};
 use imgref::*;
-use pixels::wgpu::{Backends, TextureFormat};
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-use value_box::{ReturnBoxerResult, ValueBox, ValueBoxPointer};
+use pixels::wgpu::{Backends, TextureFormat};
+use raw_window_handle::{
+    HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
+};
+use value_box::{BoxerError, ReturnBoxerResult, ValueBox, ValueBoxPointer};
 
 #[no_mangle]
 pub fn pixels_test() -> bool {
@@ -30,27 +32,32 @@ pub fn pixels_init_logger() {
 pub fn pixels_new_world(
     surface_width: u32,
     surface_height: u32,
-    handle: *mut ValueBox<RawWindowHandle>,
+    window_handle: *mut ValueBox<RawWindowHandle>,
+    display_handle: *mut ValueBox<RawDisplayHandle>,
 ) -> *mut ValueBox<World> {
-    handle
-        .with_clone(|window_handle| {
-            let window = Window {
-                handle: window_handle,
-            };
-            let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
-            let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
-                .wgpu_backend(Backends::METAL | Backends::GL | Backends::DX11)
-                .texture_format(TextureFormat::Bgra8UnormSrgb)
-                .build()
-                .expect("Failed to create pixels");
+    window_handle
+        .to_ref()
+        .and_then(|window_handle| {
+            display_handle.with_ref(|display_handle| {
+                let window = Window {
+                    window_handle: window_handle.clone(),
+                    display_handle: display_handle.clone(),
+                };
+                let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
+                let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
+                    .wgpu_backend(Backends::METAL | Backends::GL | Backends::DX12 | Backends::DX11)
+                    .texture_format(TextureFormat::Bgra8UnormSrgb)
+                    .build()
+                    .expect("Failed to create pixels");
 
-            World {
-                _window: window,
-                pixels,
-                buffer: Mutex::new(Buffer::new()),
-                damages: Mutex::new(Default::default()),
-                current_damage: Default::default(),
-            }
+                World {
+                    _window: window,
+                    pixels,
+                    buffer: Mutex::new(Buffer::new()),
+                    damages: Mutex::new(Default::default()),
+                    current_damage: Default::default(),
+                }
+            })
         })
         .into_raw()
 }
@@ -100,7 +107,10 @@ pub fn pixels_world_get_buffer(world: *mut ValueBox<World>) -> *mut ValueBox<Arr
 
 #[no_mangle]
 pub fn pixels_world_draw(world: *mut ValueBox<World>) {
-    world.with_mut(World::draw).log();
+    world
+        .to_ref()
+        .and_then(|mut world| world.draw().map_err(|error| BoxerError::AnyError(error.into())))
+        .log();
 }
 
 #[no_mangle]
@@ -173,7 +183,7 @@ pub struct World {
 }
 
 impl World {
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self) -> Result<(), pixels::Error> {
         let mut buffer = self.buffer.lock().unwrap();
 
         let buffer_width = buffer.buffer_width;
@@ -182,7 +192,7 @@ impl World {
         if buffer.buffer_size_dirty {
             trace!("Resize buffer to {}x{}", &buffer_width, buffer_height);
             self.pixels
-                .resize_buffer(buffer_width as u32, buffer_height as u32);
+                .resize_buffer(buffer_width as u32, buffer_height as u32)?;
         }
         if buffer.surface_size_dirty {
             trace!(
@@ -191,7 +201,7 @@ impl World {
                 buffer.surface_height
             );
             self.pixels
-                .resize_surface(buffer.surface_width as u32, buffer.surface_height as u32);
+                .resize_surface(buffer.surface_width as u32, buffer.surface_height as u32)?;
         }
 
         buffer.mark_clean();
@@ -228,7 +238,9 @@ impl World {
         self.current_damage = Damage::default();
         drop(damages);
 
-        self.pixels.render().expect("pixels.render() failed");
+        self.pixels.render()?;
+
+        Ok(())
     }
 
     pub fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
@@ -354,13 +366,21 @@ impl Buffer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[repr(C)]
 pub struct Window {
-    handle: RawWindowHandle,
+    window_handle: RawWindowHandle,
+    display_handle: RawDisplayHandle,
 }
 
 unsafe impl HasRawWindowHandle for Window {
     fn raw_window_handle(&self) -> RawWindowHandle {
-        self.handle.clone()
+        self.window_handle.clone()
+    }
+}
+
+unsafe impl HasRawDisplayHandle for Window {
+    fn raw_display_handle(&self) -> RawDisplayHandle {
+        self.display_handle.clone()
     }
 }
