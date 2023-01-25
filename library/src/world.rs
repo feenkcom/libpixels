@@ -21,25 +21,24 @@ pub fn pixels_new_world(
 ) -> *mut ValueBox<World> {
     window_handle
         .with_clone(|window_handle| {
-            display_handle.with_clone_ok(|display_handle| {
+            display_handle.with_clone(|display_handle| {
                 let window = Window {
                     window_handle,
                     display_handle,
                 };
                 let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
-                let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
+                PixelsBuilder::new(surface_width, surface_height, surface_texture)
                     .wgpu_backend(Backends::METAL | Backends::GL | Backends::DX12 | Backends::DX11)
                     .texture_format(TextureFormat::Bgra8UnormSrgb)
                     .build()
-                    .expect("Failed to create pixels");
-
-                World {
-                    _window: window,
-                    pixels,
-                    buffer: Mutex::new(Buffer::new()),
-                    damages: Mutex::new(Default::default()),
-                    current_damage: Default::default(),
-                }
+                    .map(|pixels| World {
+                        _window: window,
+                        pixels,
+                        buffer: Mutex::new(Buffer::new()),
+                        damages: Mutex::new(Default::default()),
+                        current_damage: Default::default(),
+                    })
+                    .map_err(|error| BoxerError::AnyError(Box::new(error).into()))
             })
         })
         .into_raw()
