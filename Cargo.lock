@@ -635,6 +635,7 @@ dependencies = [
  "log",
  "pixels",
  "raw-window-handle",
+ "raw-window-handle-extensions",
  "value-box",
  "value-box-ffi",
 ]
@@ -893,6 +894,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed7e3d950b66e19e0c372f3fa3fbbcf85b1746b571f74e0c2af6042a5c93420a"
 dependencies = [
  "cty",
+]
+
+[[package]]
+name = "raw-window-handle-extensions"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7da4f277175a086ebdb327a028bc75c996abb0068ca0d52171bce42b32de8f3"
+dependencies = [
+ "raw-window-handle",
 ]
 
 [[package]]

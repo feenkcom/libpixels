@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::error::Error;
 use std::mem::transmute;
 use std::sync::Mutex;
 
@@ -10,37 +11,18 @@ use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use raw_window_handle::{
     HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
 };
+use raw_window_handle_extensions::{VeryRawDisplayHandle, VeryRawWindowHandle};
 use value_box::{BoxerError, ReturnBoxerResult, ValueBox, ValueBoxPointer};
 
 #[no_mangle]
-pub fn pixels_new_world(
+pub unsafe fn pixels_new_world(
     surface_width: u32,
     surface_height: u32,
-    window_handle: *mut ValueBox<RawWindowHandle>,
-    display_handle: *mut ValueBox<RawDisplayHandle>,
+    window_handle: *mut VeryRawWindowHandle,
+    display_handle: *mut VeryRawDisplayHandle,
 ) -> *mut ValueBox<World> {
-    window_handle
-        .with_clone(|window_handle| {
-            display_handle.with_clone(|display_handle| {
-                let window = Window {
-                    window_handle,
-                    display_handle,
-                };
-                let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
-                PixelsBuilder::new(surface_width, surface_height, surface_texture)
-                    .wgpu_backend(Backends::METAL | Backends::GL | Backends::DX12 | Backends::DX11)
-                    .texture_format(TextureFormat::Bgra8UnormSrgb)
-                    .build()
-                    .map(|pixels| World {
-                        _window: window,
-                        pixels,
-                        buffer: Mutex::new(Buffer::new()),
-                        damages: Mutex::new(Default::default()),
-                        current_damage: Default::default(),
-                    })
-                    .map_err(|error| BoxerError::AnyError(Box::new(error).into()))
-            })
-        })
+    World::new(surface_width, surface_height, window_handle, display_handle)
+        .map_err(|error| error.into())
         .into_raw()
 }
 
@@ -168,6 +150,39 @@ pub struct World {
 }
 
 impl World {
+    pub unsafe fn new(
+        surface_width: u32,
+        surface_height: u32,
+        window_handle: *mut VeryRawWindowHandle,
+        display_handle: *mut VeryRawDisplayHandle,
+    ) -> Result<Self, Box<dyn Error>> {
+        let window_handle: RawWindowHandle = VeryRawWindowHandle::from_ptr(window_handle)?
+            .clone()
+            .try_into()?;
+        let display_handle: RawDisplayHandle = VeryRawDisplayHandle::from_ptr(display_handle)?
+            .clone()
+            .try_into()?;
+
+        let window = Window {
+            window_handle,
+            display_handle,
+        };
+
+        let surface_texture = SurfaceTexture::new(surface_width, surface_height, &window);
+        let pixels = PixelsBuilder::new(surface_width, surface_height, surface_texture)
+            .wgpu_backend(Backends::METAL | Backends::GL | Backends::DX12 | Backends::DX11)
+            .texture_format(TextureFormat::Bgra8UnormSrgb)
+            .build()?;
+
+        Ok(World {
+            _window: window,
+            pixels,
+            buffer: Mutex::new(Buffer::new()),
+            damages: Mutex::new(Default::default()),
+            current_damage: Default::default(),
+        })
+    }
+
     pub fn draw(&mut self) -> Result<(), pixels::Error> {
         let mut buffer = self.buffer.lock().unwrap();
 
