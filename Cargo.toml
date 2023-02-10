@@ -1,10 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "library",
-    "shared-library-builder/library",
-    "shared-library-builder/builder",
-]
+    "libpixels",
+    "libpixels-builder"]
 
 exclude = [ "target" ]
 

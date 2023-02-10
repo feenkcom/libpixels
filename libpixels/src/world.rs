@@ -45,16 +45,17 @@ pub fn pixels_world_damage(
 }
 
 #[no_mangle]
-pub fn pixels_world_resize_surface(world: *mut ValueBox<World>, width: usize, height: usize) {
+pub fn pixels_world_resize(
+    world: *mut ValueBox<World>,
+    buffer_width: usize,
+    buffer_height: usize,
+    surface_width: usize,
+    surface_height: usize,
+) {
     world
-        .with_mut_ok(|world| world.resize_surface(width, height))
-        .log();
-}
-
-#[no_mangle]
-pub fn pixels_world_resize_buffer(world: *mut ValueBox<World>, width: usize, height: usize) {
-    world
-        .with_mut_ok(|world| world.resize_buffer(width, height))
+        .with_mut_ok(|world| {
+            world.resize(buffer_width, buffer_height, surface_width, surface_height)
+        })
         .log();
 }
 
@@ -189,19 +190,20 @@ impl World {
         let buffer_width = buffer.buffer_width;
         let buffer_height = buffer.buffer_height;
 
-        if buffer.buffer_size_dirty {
-            trace!("Resize buffer to {}x{}", &buffer_width, buffer_height);
-            self.pixels
-                .resize_buffer(buffer_width as u32, buffer_height as u32)?;
-        }
         if buffer.surface_size_dirty {
             trace!(
                 "Resize surface to {}x{}",
-                &buffer.surface_width,
+                buffer.surface_width,
                 buffer.surface_height
             );
             self.pixels
                 .resize_surface(buffer.surface_width as u32, buffer.surface_height as u32)?;
+        }
+
+        if buffer.buffer_size_dirty {
+            trace!("Resize buffer to {}x{}", buffer_width, buffer_height);
+            self.pixels
+                .resize_buffer(buffer_width as u32, buffer_height as u32)?;
         }
 
         buffer.mark_clean();
@@ -243,24 +245,22 @@ impl World {
         Ok(())
     }
 
-    pub fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
-        trace!("Record buffer resize to {}x{}", buffer_width, buffer_height);
-        self.buffer
-            .lock()
-            .unwrap()
-            .resize_buffer(buffer_width, buffer_height);
-    }
+    pub fn resize(
+        &mut self,
+        buffer_width: usize,
+        buffer_height: usize,
+        surface_width: usize,
+        surface_height: usize,
+    ) {
+        let mut buffer = self.buffer.lock().unwrap();
 
-    pub fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
+        trace!("Record buffer resize to {}x{}", buffer_width, buffer_height);
         trace!(
             "Record surface resize to {}x{}",
             surface_width,
             surface_height
         );
-        self.buffer
-            .lock()
-            .unwrap()
-            .resize_surface(surface_width, surface_height);
+        buffer.resize(buffer_width, buffer_height, surface_width, surface_height)
     }
 
     pub fn damage(&mut self, damage: Damage) {
@@ -305,7 +305,18 @@ impl Buffer {
         }
     }
 
-    pub fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
+    fn resize(
+        &mut self,
+        buffer_width: usize,
+        buffer_height: usize,
+        surface_width: usize,
+        surface_height: usize,
+    ) {
+        self.resize_buffer(buffer_width, buffer_height);
+        self.resize_surface(surface_width, surface_height);
+    }
+
+    fn resize_buffer(&mut self, buffer_width: usize, buffer_height: usize) {
         if self.buffer_width == buffer_width && self.buffer_height == buffer_height {
             return;
         }
@@ -318,7 +329,7 @@ impl Buffer {
             .resize(buffer_width * buffer_height, Default::default());
     }
 
-    pub fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
+    fn resize_surface(&mut self, surface_width: usize, surface_height: usize) {
         if self.surface_width == surface_width && self.surface_height == surface_height {
             return;
         }
