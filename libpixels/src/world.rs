@@ -12,7 +12,9 @@ use raw_window_handle::{
     HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
 };
 use raw_window_handle_extensions::{VeryRawDisplayHandle, VeryRawWindowHandle};
-use value_box::{BoxerError, ReturnBoxerResult, ValueBox, ValueBoxPointer};
+use value_box::{
+    value_box, BoxerError, ReturnBoxerResult, ValueBox, ValueBoxIntoRaw, ValueBoxPointer,
+};
 
 #[no_mangle]
 pub unsafe fn pixels_new_world(
@@ -23,6 +25,7 @@ pub unsafe fn pixels_new_world(
 ) -> *mut ValueBox<World> {
     World::new(surface_width, surface_height, window_handle, display_handle)
         .map_err(|error| error.into())
+        .map(|world| value_box!(world))
         .into_raw()
 }
 
@@ -65,7 +68,7 @@ pub fn pixels_world_get_buffer(world: *mut ValueBox<World>) -> *mut ValueBox<Arr
         .with_ref_ok(|world| {
             let buffer = world.buffer.lock().unwrap();
             let slice = buffer.pixels.as_slice();
-            ArrayBox::from_data(slice.as_ptr() as *mut u8, slice.len() * 4)
+            value_box!(ArrayBox::from_data(slice.as_ptr() as *mut u8, slice.len() * 4))
         })
         .into_raw()
 }
