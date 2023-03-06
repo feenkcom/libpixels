@@ -14,3 +14,8 @@ overflow-checks = true
 
 [profile.release]
 opt-level = 3
+
+[patch.crates-io]
+wgpu = { git = "https://github.com/syrel/wgpu.git", rev = "4f9f96f57ad7e117570b84e33e867b51b97e1adc" }
+wgpu-core = { git = "https://github.com/syrel/wgpu.git", rev = "4f9f96f57ad7e117570b84e33e867b51b97e1adc" }
+wgpu-hal = { git = "https://github.com/syrel/wgpu.git", rev = "4f9f96f57ad7e117570b84e33e867b51b97e1adc" }

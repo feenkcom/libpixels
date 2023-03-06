@@ -134,9 +134,9 @@ checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
 
 [[package]]
 name = "bytemuck"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c041d3eab048880cb0b86b256447da3f18859a163c3b8d8893f4e6368abe6393"
+checksum = "17febce684fd15d89027105661fec94afb475cb995fbc59d2865198446ba2eea"
 
 [[package]]
 name = "byteorder"
@@ -255,9 +255,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.6"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2dd04ddaf88237dc3b8d8f9a3c1004b506b54b3313403944054d23c0870c521"
+checksum = "cf2b3e8478797446514c91ef04bafcb59faba183e621ad488df88983cc14128c"
 dependencies = [
  "cfg-if",
  "crossbeam-utils",
@@ -265,9 +265,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-deque"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "715e8152b692bba2d374b53d4875445368fdf21a94751410af607a5ac677d1fc"
+checksum = "ce6fd6f855243022dcecf8702fef0c297d4338e226845fe067f6341ad9fa0cef"
 dependencies = [
  "cfg-if",
  "crossbeam-epoch",
@@ -276,9 +276,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.13"
+version = "0.9.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01a9af1f4c2ef74bb8aa1f7e19706bc72d03598c8a570bb5de72243c7a9d9d5a"
+checksum = "46bd5f3f85273295a9d14aedfb86f6aadbff6d8f5295c4a9edb08e819dcf5695"
 dependencies = [
  "autocfg",
  "cfg-if",
@@ -299,9 +299,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.14"
+version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb766fa798726286dbbb842f174001dab8abc7b627a1dd86e0b7222a95d929f"
+checksum = "3c063cd8cc95f5c377ed0d4b49a4b21f632396ff690e8470c29b3359b346984b"
 dependencies = [
  "cfg-if",
 ]
@@ -325,8 +325,7 @@ checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 [[package]]
 name = "d3d12"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8f0de2f5a8e7bd4a9eec0e3c781992a4ce1724f68aec7d7a3715344de8b39da"
+source = "git+https://github.com/gfx-rs/d3d12-rs?rev=b940b1d71#b940b1d71ab7083ae80eec697872672dc1f2bd32"
 dependencies = [
  "bitflags",
  "libloading",
@@ -750,9 +749,9 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memoffset"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
 dependencies = [
  "autocfg",
 ]
@@ -783,8 +782,7 @@ dependencies = [
 [[package]]
 name = "naga"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5eafe22a23b797c9bc227c6c896419b26b5bb88fa903417a3adaed08778850d5"
+source = "git+https://github.com/gfx-rs/naga?rev=f0edae8#f0edae8ce9e55eeef489fc53b10dc95fb79561cc"
 dependencies = [
  "bit-set",
  "bitflags",
@@ -887,7 +885,7 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 [[package]]
 name = "pixels"
 version = "0.11.0"
-source = "git+https://github.com/parasyte/pixels.git?rev=860559272a09b1bf2e2a021b627ea33453d7f029#860559272a09b1bf2e2a021b627ea33453d7f029"
+source = "git+https://github.com/parasyte/pixels.git?rev=eede10ba4256644f9286b4377c31eba6ac48538e#eede10ba4256644f9286b4377c31eba6ac48538e"
 dependencies = [
  "bytemuck",
  "pollster",
@@ -1107,7 +1105,7 @@ dependencies = [
 [[package]]
 name = "shared-library-builder"
 version = "0.4.0"
-source = "git+https://github.com/feenkcom/shared-library-builder-rs#22aec1d6a393779cbc8bc03f78e3b2abb8052537"
+source = "git+https://github.com/feenkcom/shared-library-builder-rs#cd3b0be1f34c40adbe88e0ddd86efb642afce63d"
 dependencies = [
  "clap",
  "file-matcher",
@@ -1333,9 +1331,9 @@ checksum = "07a91d0648d862a02d641c82292791accfe66d36df75d8149ebc9768f2e36863"
 
 [[package]]
 name = "value-box"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95d27cbe738382b61bda15e558e7715a56997c0c45260c4cc62f40cbf1755f64"
+checksum = "ccd280fcd3b0d68119674f99a5739f72ce016a40e6edf6256a65b62eb4413266"
 dependencies = [
  "log",
  "thiserror",
@@ -1445,8 +1443,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d745a1b6d91d85c33defbb29f0eee0450e1d2614d987e14bf6baf26009d132d7"
+source = "git+https://github.com/syrel/wgpu.git?rev=4f9f96f57ad7e117570b84e33e867b51b97e1adc#4f9f96f57ad7e117570b84e33e867b51b97e1adc"
 dependencies = [
  "arrayvec",
  "cfg-if",
@@ -1469,8 +1466,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7131408d940e335792645a98f03639573b0480e9e2e7cddbbab74f7c6d9f3fff"
+source = "git+https://github.com/syrel/wgpu.git?rev=4f9f96f57ad7e117570b84e33e867b51b97e1adc#4f9f96f57ad7e117570b84e33e867b51b97e1adc"
 dependencies = [
  "arrayvec",
  "bit-vec",
@@ -1492,8 +1488,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a7816f00690eca4540579ad861ee9b646d938b467ce83caa5ffb8b1d8180f6"
+source = "git+https://github.com/syrel/wgpu.git?rev=4f9f96f57ad7e117570b84e33e867b51b97e1adc#4f9f96f57ad7e117570b84e33e867b51b97e1adc"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -1534,8 +1529,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a321d5436275e62be2d1ebb87991486fb3a561823656beb5410571500972cc65"
+source = "git+https://github.com/syrel/wgpu.git?rev=4f9f96f57ad7e117570b84e33e867b51b97e1adc#4f9f96f57ad7e117570b84e33e867b51b97e1adc"
 dependencies = [
  "bitflags",
  "js-sys",
@@ -1555,9 +1549,9 @@ dependencies = [
 
 [[package]]
 name = "wide"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3c11d2adfe89e9da42f01023d2c2998c53aa916ef4d26ca716dbb983725c0d2"
+checksum = "b689b6c49d6549434bf944e6b0f39238cf63693cb7a147e9d887507fffa3b223"
 dependencies = [
  "bytemuck",
  "safe_arch",
