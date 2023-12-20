@@ -212,7 +212,7 @@ impl World {
         buffer.mark_clean();
         drop(buffer);
 
-        let frame: &mut [u32] = unsafe { transmute(self.pixels.get_frame_mut()) };
+        let frame: &mut [u32] = unsafe { transmute(self.pixels.frame_mut()) };
 
         let mut frame_image =
             ImgRefMut::new_stride(frame, buffer_width, buffer_height, buffer_width);

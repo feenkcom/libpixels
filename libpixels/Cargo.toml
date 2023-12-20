@@ -5,7 +5,7 @@ authors = ["feenk gmbh. <contact@feenk.com>"]
 edition = "2021"
 
 [dependencies]
-pixels = { git = "https://github.com/parasyte/pixels.git", rev = "eede10ba4256644f9286b4377c31eba6ac48538e" }
+pixels = { git = "https://github.com/parasyte/pixels.git", rev = "5461133a631bd6d124346c80b4d7596d44631184" }
 raw-window-handle = "0.5"
 raw-window-handle-extensions = "0.5"
 imgref = "1.9"
