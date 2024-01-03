@@ -167,6 +167,12 @@ impl World {
             .clone()
             .try_into()?;
 
+        debug!("Creating new Pixels World...");
+        debug!("Window handle: {:?}", &window_handle);
+        debug!("Display handle: {:?}", &display_handle);
+        debug!("Surface width: {}", &surface_width);
+        debug!("Surface height: {}", &surface_height);
+
         let window = Window {
             window_handle,
             display_handle,
